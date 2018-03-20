@@ -18,7 +18,6 @@ import psq
 
 import reddit
 from storage import Storage
-from vision import VisionApi
 
 
 def download_image(image_url):
@@ -27,27 +26,21 @@ def download_image(image_url):
     return r.content
 
 
-def label_images(vision, storage, subreddit, image_urls):
+def label_images(storage, subreddit, image_urls):
     image_contents = [
         download_image(image_url)
         for image_url
         in image_urls]
 
-    # TODO content check
-
-    response = vision.detect_labels(image_contents)
-
-    for image_url, labels in zip(image_urls, response):
-        labels.append('r/%s' % subreddit)
+    for image_url in image_urls:
+        labels = ['r/%s' % subreddit]
         storage.add_labels(labels)
         storage.add_image(image_url, labels)
 
 
 def label_images_task(subreddit, image_urls):
-    vision = VisionApi()
     storage = Storage()
-
-    label_images(vision, storage, subreddit, image_urls)
+    label_images(storage, subreddit, image_urls)
 
 
 def scrape_reddit(subreddit, pages=10):
