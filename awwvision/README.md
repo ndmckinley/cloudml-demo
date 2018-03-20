@@ -1,103 +1,131 @@
-![status: inactive](https://img.shields.io/badge/status-inactive-red.svg)
+# Awwvision
 
-**This repo is being deprecated**. All new work can be found at a given
-language's repo:
+*Awwvision* is a [Kubernetes](https://github.com/kubernetes/kubernetes/) and [Cloud Vision API](https://cloud.google.com/vision/) sample that uses the Vision API to classify (label) images from Reddit's [/r/aww](https://reddit.com/r/aww) subreddit, and display the labelled results in a web app.
 
-[C# / .NET][c#] | [Go lang][golang] | [Java][java] | [Node.js][nodejs] |
-[PHP][php] | [Python][python] | [Ruby][ruby]
+Awwvision has three components:
 
-Note: The [Android](android/) and [IOS](ios/) samples haven't been moved to the
-main [Android][android] and [IOS][ios] sample repos yet.
+1. A simple [Redis](http://redis.io/) instance.
+2. A webapp that displays the labels and associated images.
+3. A worker that handles scraping Reddit for images and classifying them using the Vision API. [Cloud Pub/Sub](https://cloud.google.com/pubsub/) is used to coordinate tasks between multiple worker instances.
 
-[c#]: //github.com/GoogleCloudPlatform/dotnet-docs-samples/tree/master/vision/api
-[golang]: //github.com/GoogleCloudPlatform/golang-samples/tree/master/vision
-[java]: //github.com/GoogleCloudPlatform/java-docs-samples/tree/master/vision
-[nodejs]: //github.com/GoogleCloudPlatform/nodejs-docs-samples/tree/master/vision
-[php]: //github.com/GoogleCloudPlatform/php-docs-samples/tree/master/vision
-[python]: //github.com/GoogleCloudPlatform/python-docs-samples/tree/master/vision
-[ruby]: //github.com/GoogleCloudPlatform/ruby-docs-samples/tree/master/vision
-[android]: //github.com/GoogleCloudPlatform/android-docs-samples/
-[ios]: //github.com/GoogleCloudPlatform/ios-docs-samples/
+## Prerequisites
 
------
+1. Create a project in the [Google Cloud Platform Console](https://console.cloud.google.com).
 
-# Google Cloud Vision API examples
+2. [Enable billing](https://console.cloud.google.com/project/_/settings) for your project.
 
-This repo contains some [Google Cloud Vision
-API](https://cloud.google.com/vision/) examples.
+3. Enable the Vision and Pub/Sub APIs. See the ["Getting Started"](https://cloud.google.com/vision/docs/getting-started) page in the Vision API documentation for more information on using the Vision API.
 
-The samples are organized by language and mobile platform.
+4. Install the [Google Cloud SDK](https://cloud.google.com/sdk):
 
-## Language Examples
+        $ curl https://sdk.cloud.google.com | bash
+        $ gcloud init
 
-### Landmark Detection Using Google Cloud Storage
+5. Install and start up [Docker](https://www.docker.com/).
 
-This sample identifies a landmark within an image stored on
-Google Cloud Storage.
+If you like, you can alternately run this tutorial from your project's
+[Cloud Shell](https://cloud.google.com/shell/docs/).  In that case, you don't need to do steps 4 and 5.
 
-- [Documentation and Java Code](https://github.com/GoogleCloudPlatform/java-docs-samples/tree/master/vision/landmark-detection)
-- [Documentation and Python Code](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/python/landmark_detection/)
+## Create a Container Engine cluster
 
-### Face Detection
+This example uses [Container Engine](https://cloud.google.com/container-engine/) to set up the Kubernetes cluster.
 
-See the [face detection](https://cloud.google.com/vision/docs/face-tutorial) tutorial in the docs.
+1. Create a cluster using `gcloud`. You can specify as many nodes as you want,
+   but you need at least one. The `cloud-platform` scope is used to allow
+   access to the Pub/Sub and Vision APIs.
+   First set your zone, e.g.:
 
-- [Python Code](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/vision/api/face_detection)
-- [Java Code](https://github.com/GoogleCloudPlatform/java-docs-samples/tree/master/vision/face-detection)
+        gcloud config set compute/zone us-central1-f
 
-### Label Detection
+   Then start up the cluster:
 
-See the [label detection](https://cloud.google.com/vision/docs/label-tutorial) tutorial in the docs.
+        gcloud container clusters create awwvision \
+            --num-nodes 2 \
+            --scopes cloud-platform
 
-- [Python Code](https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/vision/api/label)
-- [Java Code](https://github.com/GoogleCloudPlatform/java-docs-samples/tree/master/vision/label)
+2. Set up the `kubectl` command-line tool to use the container's credentials.
 
-### Label Tagging Using Kubernetes
+        gcloud container clusters get-credentials awwvision
 
-*Awwvision* is a [Kubernetes](https://github.com/kubernetes/kubernetes/) and
-[Cloud Vision API](https://cloud.google.com/vision/) sample that uses the
-Vision API to classify (label) images from Reddit's
-[/r/aww](https://reddit.com/r/aww) subreddit, and display the labelled results
-in a web application.
+3. Verify that everything is working:
 
-- [Documentation and Python Code](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/python/awwvision)
+        kubectl cluster-info
 
-### Text Detection Using the Vision API
+## Deploy the sample
 
-This sample uses `TEXT_DETECTION` Vision API requests to build an inverted
-index from the stemmed words found in the images, and stores that index in a
-[Redis](redis.io) database. The resulting index can be queried to find
-images that match a given set of words, and to list text that was found in each
-matching image.
+From the `awwvision` directory, use `make all` to build and deploy everything.
+Make sure Docker is running first.
 
-For finding stopwords and doing stemming, the Python example uses the
-[nltk](http://www.nltk.org/index.html) (Natural Language Toolkit) library.
-The Java example uses the [OpenNLP](https://opennlp.apache.org/) library.
+        make all
 
-- [Documentation and Python Code](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/python/text)
-- [Documentation and Java Code](https://github.com/GoogleCloudPlatform/java-docs-samples/tree/master/vision/text)
+As part of the process, a Docker image will be built and uploaded to the
+[GCR](https://cloud.google.com/container-registry/docs/) private container
+registry. In addition, `.yaml` files will be generated from templates— filled in
+with information specific to your project— and used to deploy the 'redis',
+'webapp', and 'worker' Kubernetes resources for the example.
 
-## Mobile Platform Examples
+### Check the Kubernetes resources on the cluster
 
-### Image Detection Using Android Device Photos
+After you've deployed, check that the Kubernetes resources are up and running.
+First, list the [pods](https://kubernetes.io/docs/concepts/workloads/pods/pod/).
+You should see something like the following, though your pod names will be different.
 
-This simple single-activity sample that shows you how to make a call to the
-Cloud Vision API with an image picked from your device’s gallery.
+```
+$ kubectl get pods
+NAME                     READY     STATUS    RESTARTS   AGE
+awwvision-webapp-vwmr1   1/1       Running   0          1m
+awwvision-worker-oz6xn   1/1       Running   0          1m
+awwvision-worker-qc0b0   1/1       Running   0          1m
+awwvision-worker-xpe53   1/1       Running   0          1m
+redis-master-rpap8       1/1       Running   0          2m
+```
 
-- [Documentation and Android Code](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/android)
+List the
+[deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
+You can see the number of replicas specified for each, and the images used.
 
-### Image Detection Using iOS Device Photos
+```
+$ kubectl get deployments -o wide
+NAME               DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE       CONTAINERS         IMAGES                                SELECTOR
+awwvision-webapp   1         1         1            1           1m        awwvision-webapp   gcr.io/your-project/awwvision-webapp   app=awwvision,role=frontend
+awwvision-worker   3         3         3            3           1m        awwvision-worker   gcr.io/your-project/awwvision-worker   app=awwvision,role=worker
+redis-master       1         1         1            1           1m        redis-master       redis                                 app=redis,role=master
+```
 
-The Swift and Objective-C versions of this app use the Vision API to run label
-and face detection on an image from the device's photo library. The resulting
-labels and face metadata from the API response are displayed in the UI.
+Once deployed, get the external IP address of the webapp
+[service](https://kubernetes.io/docs/concepts/services-networking/service/).
+It may take a few minutes for the assigned external IP to be
+listed in the output.  After a short wait, you should see something like the
+following, though your IPs will be different.
 
-Check out the Swift or Objective-C READMEs for specific getting started
-instructions.
+```
+$ kubectl get svc awwvision-webapp
+NAME               CLUSTER_IP      EXTERNAL_IP    PORT(S)   SELECTOR                      AGE
+awwvision-webapp   10.163.250.49   23.236.61.91   80/TCP    app=awwvision,role=frontend   13m
+```
 
-- [Documentation (Objective-C)](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/ios/Objective-C/README.md)
+### Visit your new webapp and start its crawler
 
-- [Documentation (Swift)](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/ios/Swift/README.md)
+Visit the external IP of the `awwvision-webapp` service to open the webapp in
+your browser, and click the `Start the Crawler` button.
 
-- [iOS Sample Code](https://github.com/GoogleCloudPlatform/cloud-vision/tree/master/ios)
+Next, click `go back`, and you should start to see images from the
+[/r/aww](https://reddit.com/r/aww) subreddit classified by the labels provided
+by the Vision API. You will see some of the images classified multiple times, where multiple
+labels are detected for them.
+(You can reload in a bit, in case you brought up the page before the crawler was
+finished).
 
+<a href="https://storage.googleapis.com/amy-jo/images/ubiquity/awwvision.png" target="_blank"><img src="https://storage.googleapis.com/amy-jo/images/ubiquity/awwvision.png" width=500/></a>
+
+## Cleanup
+
+To delete your Kubernetes pods, replication controllers, and services, and to
+remove your auto-generated `.yaml` files, do:
+
+        make delete
+
+Note: this won't delete your Container Engine cluster itself.
+If you are no longer using the cluster, you may want to take it down.
+You can do this through the
+[Google Cloud Platform Console](https://console.cloud.google.com).
