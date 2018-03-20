@@ -33,7 +33,7 @@ def index():
     return render_template('index.html', labels=labels_and_images)
 
 
-@app.route('/label/<label>')
+@app.route('/label/<path:label>')
 def label(label):
     images = storage.get_images(label)
     return render_template('label.html', images=images)
