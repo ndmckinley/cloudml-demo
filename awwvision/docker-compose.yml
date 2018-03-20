@@ -1,0 +1,17 @@
+version: '2'
+services:
+    web:
+        build: webapp
+        ports:
+            - "8080:8080"
+        environment: 
+            - "GCLOUD_PROJECT=personal-graphite-testing"
+            - "PORT=8080"
+            - "REDIS_HOST=redis"
+    redis:
+        image: "redis:alpine"
+    worker:
+        build: worker
+        environment: 
+            - "GCLOUD_PROJECT=personal-graphite-testing"
+            - "REDIS_HOST=redis"

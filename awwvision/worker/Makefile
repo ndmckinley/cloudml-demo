@@ -3,6 +3,9 @@ GCLOUD_PROJECT:=$(shell gcloud config list project --format="value(core.project)
 .PHONY: all
 all: deploy
 
+.PHONY: local
+local: push
+
 .PHONY: build
 build:
 	docker build -t gcr.io/$(GCLOUD_PROJECT)/awwvision-worker .

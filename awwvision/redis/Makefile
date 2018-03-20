@@ -1,3 +1,7 @@
+.PHONY: local
+local:
+	echo "Nothing to do to build redis container locally."
+
 .PHONY: all
 all: deploy
 

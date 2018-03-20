@@ -1,3 +1,6 @@
+.PHONY: local
+local: redis-local webapp-local worker-local
+
 .PHONY: all
 all: redis webapp worker
 
@@ -15,6 +18,18 @@ webapp:
 .PHONY: worker
 worker:
 	$(MAKE) -C worker all
+
+.PHONY: redis-local
+redis-local:
+	$(MAKE) -C redis local
+
+.PHONY: webapp-local
+webapp-local:
+	$(MAKE) -C webapp local
+
+.PHONY: worker-local
+worker:
+	$(MAKE) -C worker local
 
 .PHONY: delete-redis
 delete-redis:
