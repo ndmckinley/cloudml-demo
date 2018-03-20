@@ -41,7 +41,10 @@ def label(label):
 
 @app.route('/start_crawler', methods=['POST'])
 def start_crawler():
-    q.enqueue('main.scrape_reddit_task', 'aww', pages=20)
+    q.enqueue('main.scrape_reddit_task', 'aww', pages=5)
+    q.enqueue('main.scrape_reddit_task', 'cats', pages=5)
+    q.enqueue('main.scrape_reddit_task', 'PuppySmiles', pages=5)
+    q.enqueue('main.scrape_reddit_task', 'tinyanimalsonfingers', pages=5)
     return render_template('crawler_started.html')
 
 

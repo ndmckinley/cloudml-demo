@@ -20,24 +20,22 @@ from oauth2client.client import GoogleCredentials
 DISCOVERY_URL='https://{api}.googleapis.com/$discovery/rest?version={apiVersion}'
 
 
-class VisionApi(object):
-    def __init__(self):
-        self.vision = self._create_client()
-
-    def _create_client(self):
+class GoogleApi(object):
+    def _create_client(self, api, version):
         credentials = GoogleCredentials.get_application_default()
         return discovery.build(
-            'vision', 'v1', credentials=credentials,
+            api, version, credentials=credentials,
             discoveryServiceUrl=DISCOVERY_URL)
 
-    def detect_labels(self, images, max_results=2, num_retries=3):
+class VisionApi(GoogleApi):
+    def __init__(self):
+        self.vision = self._create_client('vision', 'v1')
+
+    def detect_labels(self, images, max_results=2, num_retries=15):
         """Uses the Vision API to detect text in the given file.
         """
 
-        batch_request = []
-
-        for image in images:
-            batch_request.append({
+        batch_request = [{
                 'image': {
                     'content': base64.b64encode(image).decode('UTF-8')
                 },
@@ -45,19 +43,14 @@ class VisionApi(object):
                     'type': 'LABEL_DETECTION',
                     'maxResults': max_results,
                 }]
-            })
+            } for image in images]
 
         request = self.vision.images().annotate(
             body={'requests': batch_request})
 
         response = request.execute(num_retries=num_retries)
 
-        label_responses = []
-
-        for r in response['responses']:
-            labels = [
-                x['description'] for x in r.get('labelAnnotations', [])]
-
-            label_responses.append(labels)
-
-        return label_responses
+        return [
+                [ x['description'] for x in r.get('labelAnnotations', [])]
+                for r in response['responses']
+               ]

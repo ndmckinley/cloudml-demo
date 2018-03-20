@@ -27,7 +27,7 @@ def download_image(image_url):
     return r.content
 
 
-def label_images(vision, storage, image_urls):
+def label_images(vision, storage, subreddit, image_urls):
     image_contents = [
         download_image(image_url)
         for image_url
@@ -38,29 +38,30 @@ def label_images(vision, storage, image_urls):
     response = vision.detect_labels(image_contents)
 
     for image_url, labels in zip(image_urls, response):
+        labels.append('r/%s' % subreddit)
         storage.add_labels(labels)
         storage.add_image(image_url, labels)
 
 
-def label_images_task(image_urls):
+def label_images_task(subreddit, image_urls):
     vision = VisionApi()
     storage = Storage()
 
-    label_images(vision, storage, image_urls)
+    label_images(vision, storage, subreddit, image_urls)
 
 
 def scrape_reddit(subreddit, pages=10):
     after = None
 
     for _ in range(pages):
-        posts, after = reddit.get_hot('aww', after=after)
+        posts, after = reddit.get_hot(subreddit, after=after)
         yield reddit.get_previews(posts)
 
 
 def scrape_reddit_task(subreddit, pages=20):
     for image_urls in scrape_reddit(subreddit, pages):
         q = psq.Queue(pubsub.Client(), 'images')
-        q.enqueue('main.label_images_task', image_urls)
+        q.enqueue('main.label_images_task', subreddit, image_urls)
         print("Enqueued {} images".format(len(image_urls)))
 
 
