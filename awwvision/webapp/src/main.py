@@ -45,6 +45,9 @@ def start_crawler():
     q.enqueue('main.scrape_reddit_task', 'cats', pages=5)
     q.enqueue('main.scrape_reddit_task', 'PuppySmiles', pages=5)
     q.enqueue('main.scrape_reddit_task', 'tinyanimalsonfingers', pages=5)
+    q.enqueue('main.scrape_reddit_task', 'BeachDogs', pages=5)
+    q.enqueue('main.scrape_reddit_task', 'kitty', pages=5)
+    q.enqueue('main.scrape_reddit_task', 'happydogs', pages=5)
     return render_template('crawler_started.html')
 
 
