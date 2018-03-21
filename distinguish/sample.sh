@@ -17,15 +17,30 @@
 # first time with the service, start here:
 # https://cloud.google.com/ml/docs/how-tos/getting-set-up
 
-# Now that we are set up, we can start processing some flowers images.
+# Now that we are set up, we can start processing some images.
+set -x
 declare -r PROJECT=$(gcloud config list project --format "value(core.project)")
-declare -r JOB_ID="flowers_${USER}_$(date +%Y%m%d_%H%M%S)"
+declare -r DATE=$(date +%y%m%d_%H%M%S)
+declare -r JOB_ID="class_distinguish_${USER}_${DATE}"
 declare -r BUCKET="gs://${PROJECT}-ml"
 declare -r GCS_PATH="${BUCKET}/${USER}/${JOB_ID}"
-declare -r DICT_FILE=gs://cloud-ml-data/img/flower_photos/dict.txt
+declare -r DICT_FILE="${BUCKET}/${USER}/${DATE}/dict.txt"
 
-declare -r MODEL_NAME=flowers
+declare -r MODEL_NAME=classes
 declare -r VERSION_NAME=v1
+declare -r LOCAL_DATA_DIR=./data
+declare -r EVAL_SET_FILE="$GCS_PATH/eval_set.csv"
+declare -r TRAIN_SET_FILE="$GCS_PATH/train_set.csv"
+
+for dir in $(ls -d1 $LOCAL_DATA_DIR/**); do
+    gsutil cp -r $dir "$GCS_PATH/data/"
+    gsutil ls "$GCS_PATH/data/$(basename $dir)" | sed "s/$/,$(basename $dir)/" >> /tmp/eval_set.csv
+done
+gsutil cp /tmp/eval_set.csv $TRAIN_SET_FILE
+shuf -n 100 /tmp/eval_set.csv > /tmp/real_eval_set.csv
+gsutil cp /tmp/real_eval_set.csv $EVAL_SET_FILE
+ls $LOCAL_DATA_DIR > /tmp/dict.txt
+gsutil cp /tmp/dict.txt $DICT_FILE
 
 echo
 echo "Using job id: " $JOB_ID
@@ -39,13 +54,13 @@ set -v -e
 # CPU's.  Check progress here: https://console.cloud.google.com/dataflow
 python trainer/preprocess.py \
   --input_dict "$DICT_FILE" \
-  --input_path "gs://cloud-ml-data/img/flower_photos/eval_set.csv" \
+  --input_path "$EVAL_SET_FILE" \
   --output_path "${GCS_PATH}/preproc/eval" \
   --cloud
 
 python trainer/preprocess.py \
   --input_dict "$DICT_FILE" \
-  --input_path "gs://cloud-ml-data/img/flower_photos/train_set.csv" \
+  --input_path "$TRAIN_SET_FILE" \
   --output_path "${GCS_PATH}/preproc/train" \
   --cloud
 
@@ -61,12 +76,13 @@ gcloud ml-engine jobs submit training "$JOB_ID" \
   -- \
   --output_path "${GCS_PATH}/training" \
   --eval_data_paths "${GCS_PATH}/preproc/eval*" \
-  --train_data_paths "${GCS_PATH}/preproc/train*"
+  --train_data_paths "${GCS_PATH}/preproc/train*" \
+  --label_count 7
 
 # Remove the model and its version
 # Make sure no error is reported if model does not exist
-gcloud ml-engine versions delete $VERSION_NAME --model=$MODEL_NAME -q --verbosity none
-gcloud ml-engine models delete $MODEL_NAME -q --verbosity none
+gcloud ml-engine versions delete $VERSION_NAME --model=$MODEL_NAME -q --verbosity none || true
+gcloud ml-engine models delete $MODEL_NAME -q --verbosity none || true
 
 # Tell CloudML about a new type of model coming.  Think of a "model" here as
 # a namespace for deployed Tensorflow graphs.
