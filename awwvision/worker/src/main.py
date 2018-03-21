@@ -18,6 +18,7 @@ import psq
 
 import reddit
 from storage import Storage
+from google.cloud import vision
 
 
 def download_image(image_url):
@@ -27,13 +28,12 @@ def download_image(image_url):
 
 
 def label_images(storage, subreddit, image_urls):
-    image_contents = [
-        download_image(image_url)
-        for image_url
-        in image_urls]
-
+    client = vision.ImageAnnotatorClient()
     for image_url in image_urls:
-        labels = ['r/%s' % subreddit]
+        content = download_image(image_url)
+        image = vision.types.Image(content=content)
+        response = client.label_detection(image=image)
+        labels = ['r/%s' % subreddit] + [l.description for l in response.label_annotations]
         storage.add_labels(labels)
         storage.add_image(image_url, labels)
 
