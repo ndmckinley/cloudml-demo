@@ -84,8 +84,11 @@ class Evaluator(object):
             self.batch_of_examples.append(session.run(self.tensors.examples))
 
         for i in range(num_eval_batches):
-          session.run(self.tensors.metric_updates,
-                      {self.tensors.examples: self.batch_of_examples[i]})
+          logging.info("examples batches: %d", len(self.batch_of_examples))
+          logging.info("num_batches: %d", num_eval_batches)
+          if i < len(self.batch_of_examples):
+            session.run(self.tensors.metric_updates,
+                        {self.tensors.examples: self.batch_of_examples[i]})
 
       metric_values = session.run(self.tensors.metric_values)
       global_step = tf.train.global_step(session, self.tensors.global_step)
