@@ -15,6 +15,11 @@
 from gcloud import pubsub
 import requests
 import psq
+import json
+import base64
+import os
+import tempfile
+import subprocess
 
 import reddit
 from storage import Storage
@@ -29,11 +34,16 @@ def download_image(image_url):
 
 def label_images(storage, subreddit, image_urls):
     client = vision.ImageAnnotatorClient()
+    subreddits = ['aww', 'beachdogs', 'cats', 'happydogs', 'kitty', 'puppysmiles', 'tinyanimalsonfingers']
     for image_url in image_urls:
         content = download_image(image_url)
-        image = vision.types.Image(content=content)
-        response = client.label_detection(image=image)
-        labels = ['r/%s' % subreddit] + [l.description for l in response.label_annotations]
+        im_request = json.dumps({"key":"0", "image_bytes": {"b64": base64.b64encode(content)}})
+        tmpfile = tempfile.mkdtemp()
+        open(os.path.join(tmpfile, 'request.json'), 'w').write(im_request)
+        subreddit = int(subprocess.check_output(
+                "gcloud ml-engine predict --model classes --json-instances %s | awk '{print $2}' | tail -n 1" % os.path.join(
+                    tmpfile, 'request.json'), shell=True))
+        labels = ['r/%s' % subreddits[subreddit]]
         storage.add_labels(labels)
         storage.add_image(image_url, labels)
 

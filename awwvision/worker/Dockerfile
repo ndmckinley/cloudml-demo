@@ -23,6 +23,12 @@ ENV PATH /env/bin:$PATH
 
 ADD src/requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk-jessie main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+RUN apt-get update
+RUN apt-get install -y google-cloud-sdk
 
 ADD src /app
 
